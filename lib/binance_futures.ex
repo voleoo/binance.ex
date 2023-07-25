@@ -426,7 +426,7 @@ defmodule BinanceFutures do
       %{
         timestamp: :os.system_time(:millisecond)
       }
-    HTTPClient.get_signed_request_binance("/fapi/v2/account", arguments)
+    HTTPClient.signed_request_binance("/fapi/v2/account", arguments)
   end
 
   def all_orders(symbol, limit \\ 500) do
