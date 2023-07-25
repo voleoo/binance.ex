@@ -79,12 +79,14 @@ defmodule BinanceFutures.Rest.HTTPClient do
 
     body = "#{argument_string}&signature=#{signature}"
 
-    case apply(HTTPoison, method, [
-           "#{@endpoint}#{url}",
-           body,
+    case apply(HTTPoison, :request, [
+           method,
+           "#{@endpoint}#{url}?#{body}",
+           "",
            [
              {"X-MBX-APIKEY", Application.get_env(:binance, :api_key)}
-           ]
+           ],
+           []
          ]) do
       {:error, err} ->
         {:error, {:http_error, err}}

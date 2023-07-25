@@ -1,3 +1,21 @@
+# arguments =
+#   %{
+#     symbol: "GALAUSDT",
+#     side: "BUY",
+#     positionSide: "LONG",
+#     type: "LIMIT",
+#     timeInForce: "GTC",
+#     quantity: 1000,
+#     price: "0.02705",
+#     timestamp: :os.system_time(:millisecond)
+# }
+# BinanceFutures.Rest.HTTPClient.signed_request_binance("/fapi/v1/order", arguments, :post)
+
+# BinanceFutures.create_order("GALAUSDT", "BUY", "LONG", "LIMIT", 1000, "0.02705", "GTC")
+# BinanceFutures.cancel_order("GALAUSDT", 10131680427)
+# BinanceFutures.all_orders("GALAUSDT")
+# BinanceFutures.get_exchange_info
+
 defmodule BinanceFutures do
   alias BinanceFutures.Rest.HTTPClient
 
@@ -7,7 +25,7 @@ defmodule BinanceFutures do
   Pings binance API. Returns `{:ok, %{}}` if successful, `{:error, reason}` otherwise
   """
   def ping() do
-    HTTPClient.get_binance("/api/v3/ping")
+    HTTPClient.get_binance("/fapi/v1/ping")
   end
 
   @doc """
@@ -313,7 +331,7 @@ defmodule BinanceFutures do
   """
   def close_listen_key(key) do
     case HTTPClient.unsigned_request_binance(
-           "/api/v3/userDataStream?listenKey=#{key}",
+           "/fapi/v1/listenKey?listenKey=#{key}",
            nil,
            :delete
          ) do
@@ -336,6 +354,7 @@ defmodule BinanceFutures do
   def create_order(
         symbol,
         side,
+        position_side,
         type,
         quantity,
         price \\ nil,
@@ -346,6 +365,15 @@ defmodule BinanceFutures do
         receiving_window \\ 1000,
         timestamp \\ nil
       ) do
+    time_in_force =
+      case time_in_force do
+        nil ->
+          "GTC"
+
+        t ->
+          t
+      end
+
     timestamp =
       case timestamp do
         # timestamp needs to be in milliseconds
@@ -360,6 +388,7 @@ defmodule BinanceFutures do
       %{
         symbol: symbol,
         side: side,
+        positionSide: position_side,
         type: type,
         quantity: quantity,
         timestamp: timestamp,
@@ -381,7 +410,9 @@ defmodule BinanceFutures do
       |> Map.merge(unless(is_nil(time_in_force), do: %{timeInForce: time_in_force}, else: %{}))
       |> Map.merge(unless(is_nil(price), do: %{price: format_price(price)}, else: %{}))
 
-    case HTTPClient.signed_request_binance("/api/v3/order", arguments, :post) do
+    IO.puts(inspect(arguments))
+
+    case HTTPClient.signed_request_binance("/fapi/v1/order", arguments, :post) do
       {:ok, %{"code" => code, "msg" => msg}} ->
         {:error, {:binance_error, %{code: code, msg: msg}}}
 
@@ -390,6 +421,42 @@ defmodule BinanceFutures do
     end
   end
 
+  def account do
+    arguments =
+      %{
+        timestamp: :os.system_time(:millisecond)
+      }
+    HTTPClient.get_signed_request_binance("/fapi/v2/account", arguments)
+  end
+
+  def all_orders(symbol, limit \\ 500) do
+    arguments =
+      %{
+        symbol: symbol,
+        limit: limit,
+        timestamp: :os.system_time(:millisecond)
+      }
+
+    HTTPClient.signed_request_binance("/fapi/v1/allOrders", arguments, :get)
+  end
+
+  def cancel_order(symbol, order_id) do
+    arguments =
+      %{
+        symbol: symbol,
+        orderId: order_id,
+        timestamp: :os.system_time(:millisecond)
+      }
+    case HTTPClient.signed_request_binance("/fapi/v1/order", arguments, :delete) do
+      {:ok, %{"code" => code, "msg" => msg}} ->
+        {:error, {:binance_error, %{code: code, msg: msg}}}
+
+      data ->
+        data
+    end
+  end
+
+
   @doc """
   Creates a new **limit** **buy** order
 
@@ -397,31 +464,31 @@ defmodule BinanceFutures do
 
   Returns `{:ok, %{}}` or `{:error, reason}`
   """
-  def order_limit_buy(symbol, quantity, price, time_in_force \\ "GTC")
+  # def order_limit_buy(symbol, quantity, price, time_in_force \\ "GTC")
 
-  def order_limit_buy(
-        %Binance.TradePair{from: from, to: to} = symbol,
-        quantity,
-        price,
-        time_in_force
-      )
-      when is_number(quantity)
-      when is_number(price)
-      when is_binary(from)
-      when is_binary(to) do
-    case find_symbol(symbol) do
-      {:ok, binance_symbol} -> order_limit_buy(binance_symbol, quantity, price, time_in_force)
-      e -> e
-    end
-  end
+  # def order_limit_buy(
+  #       %Binance.TradePair{from: from, to: to} = symbol,
+  #       quantity,
+  #       price,
+  #       time_in_force
+  #     )
+  #     when is_number(quantity)
+  #     when is_number(price)
+  #     when is_binary(from)
+  #     when is_binary(to) do
+  #   case find_symbol(symbol) do
+  #     {:ok, binance_symbol} -> order_limit_buy(binance_symbol, quantity, price, time_in_force)
+  #     e -> e
+  #   end
+  # end
 
-  def order_limit_buy(symbol, quantity, price, time_in_force)
-      when is_binary(symbol)
-      when is_number(quantity)
-      when is_number(price) do
-    create_order(symbol, "BUY", "LIMIT", quantity, price, time_in_force)
-    |> parse_order_response
-  end
+  # def order_limit_buy(symbol, quantity, price, time_in_force)
+  #     when is_binary(symbol)
+  #     when is_number(quantity)
+  #     when is_number(price) do
+  #   create_order(symbol, "BUY", "LIMIT", quantity, price, time_in_force)
+  #   |> parse_order_response
+  # end
 
   @doc """
   Creates a new **limit** **sell** order
@@ -430,31 +497,31 @@ defmodule BinanceFutures do
 
   Returns `{:ok, %{}}` or `{:error, reason}`
   """
-  def order_limit_sell(symbol, quantity, price, time_in_force \\ "GTC")
+  # def order_limit_sell(symbol, quantity, price, time_in_force \\ "GTC")
 
-  def order_limit_sell(
-        %Binance.TradePair{from: from, to: to} = symbol,
-        quantity,
-        price,
-        time_in_force
-      )
-      when is_number(quantity)
-      when is_number(price)
-      when is_binary(from)
-      when is_binary(to) do
-    case find_symbol(symbol) do
-      {:ok, binance_symbol} -> order_limit_sell(binance_symbol, quantity, price, time_in_force)
-      e -> e
-    end
-  end
+  # def order_limit_sell(
+  #       %Binance.TradePair{from: from, to: to} = symbol,
+  #       quantity,
+  #       price,
+  #       time_in_force
+  #     )
+  #     when is_number(quantity)
+  #     when is_number(price)
+  #     when is_binary(from)
+  #     when is_binary(to) do
+  #   case find_symbol(symbol) do
+  #     {:ok, binance_symbol} -> order_limit_sell(binance_symbol, quantity, price, time_in_force)
+  #     e -> e
+  #   end
+  # end
 
-  def order_limit_sell(symbol, quantity, price, time_in_force)
-      when is_binary(symbol)
-      when is_number(quantity)
-      when is_number(price) do
-    create_order(symbol, "SELL", "LIMIT", quantity, price, time_in_force)
-    |> parse_order_response
-  end
+  # def order_limit_sell(symbol, quantity, price, time_in_force)
+  #     when is_binary(symbol)
+  #     when is_number(quantity)
+  #     when is_number(price) do
+  #   create_order(symbol, "SELL", "LIMIT", quantity, price, time_in_force)
+  #   |> parse_order_response
+  # end
 
   @doc """
   Creates a new **market** **buy** order
@@ -463,21 +530,21 @@ defmodule BinanceFutures do
 
   Returns `{:ok, %{}}` or `{:error, reason}`
   """
-  def order_market_buy(%Binance.TradePair{from: from, to: to} = symbol, quantity)
-      when is_number(quantity)
-      when is_binary(from)
-      when is_binary(to) do
-    case find_symbol(symbol) do
-      {:ok, binance_symbol} -> order_market_buy(binance_symbol, quantity)
-      e -> e
-    end
-  end
+  # def order_market_buy(%Binance.TradePair{from: from, to: to} = symbol, quantity)
+  #     when is_number(quantity)
+  #     when is_binary(from)
+  #     when is_binary(to) do
+  #   case find_symbol(symbol) do
+  #     {:ok, binance_symbol} -> order_market_buy(binance_symbol, quantity)
+  #     e -> e
+  #   end
+  # end
 
-  def order_market_buy(symbol, quantity)
-      when is_binary(symbol)
-      when is_number(quantity) do
-    create_order(symbol, "BUY", "MARKET", quantity)
-  end
+  # def order_market_buy(symbol, quantity)
+  #     when is_binary(symbol)
+  #     when is_number(quantity) do
+  #   create_order(symbol, "BUY", "MARKET", quantity)
+  # end
 
   @doc """
   Creates a new **market** **sell** order
@@ -486,21 +553,21 @@ defmodule BinanceFutures do
 
   Returns `{:ok, %{}}` or `{:error, reason}`
   """
-  def order_market_sell(%Binance.TradePair{from: from, to: to} = symbol, quantity)
-      when is_number(quantity)
-      when is_binary(from)
-      when is_binary(to) do
-    case find_symbol(symbol) do
-      {:ok, binance_symbol} -> order_market_sell(binance_symbol, quantity)
-      e -> e
-    end
-  end
+  # def order_market_sell(%Binance.TradePair{from: from, to: to} = symbol, quantity)
+  #     when is_number(quantity)
+  #     when is_binary(from)
+  #     when is_binary(to) do
+  #   case find_symbol(symbol) do
+  #     {:ok, binance_symbol} -> order_market_sell(binance_symbol, quantity)
+  #     e -> e
+  #   end
+  # end
 
-  def order_market_sell(symbol, quantity)
-      when is_binary(symbol)
-      when is_number(quantity) do
-    create_order(symbol, "SELL", "MARKET", quantity)
-  end
+  # def order_market_sell(symbol, quantity)
+  #     when is_binary(symbol)
+  #     when is_number(quantity) do
+  #   create_order(symbol, "SELL", "MARKET", quantity)
+  # end
 
   defp parse_order_response({:ok, response}) do
     {:ok, Binance.OrderResponse.new(response)}

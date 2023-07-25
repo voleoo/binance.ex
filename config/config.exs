@@ -3,8 +3,8 @@
 use Mix.Config
 
 config :binance,
-  api_key: "",
-  secret_key: "",
+  api_key: "Ln3twlrXZsIUHdLMoJpYpXWV9h4BN1ZVtdgrUKUtKqL9YMFO96xeOdowbmuZbQuB",
+  secret_key: "auyjK0ktcHeDeuEp1EuZjN40O9ItKfESCd8DOiw3W3iR6Gx8K1HFjtALPraSqFhr",
   end_point: "https://api.binance.com",
   futures_end_point: "https://fapi.binance.com"
 
