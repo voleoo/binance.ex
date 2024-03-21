@@ -53,6 +53,42 @@ defmodule BinanceFutures do
     end
   end
 
+  def open_interest(symbol)
+    when is_binary(symbol) do
+    arguments = %{ symbol: symbol }
+    case HTTPClient.unsigned_request_binance("/fapi/v1/openInterest",
+     arguments,
+     :get
+    ) do
+      {:ok, data} ->
+        {:ok, BinanceFutures.OpenInterest.new(data)}
+      {:error, err} ->
+        err
+    end
+  end
+
+  def open_interest_hist(symbol, period, limit \\ nil)
+    when is_binary(symbol) and is_binary(period) do
+      arguments = %{ symbol: symbol, period: period }
+      |> Map.merge(
+        unless(
+          is_nil(limit),
+          do: %{limit: limit},
+          else: %{}
+        )
+      )
+    case HTTPClient.unsigned_request_binance("/futures/data/openInterestHist",
+     arguments,
+     :get
+    ) do
+      {:ok, data} ->
+        {:ok, Enum.map(data, &BinanceFutures.OpenInterestHist.new(&1))}
+
+      {:error, err} ->
+        err
+    end
+  end
+
   @doc """
   Get historical trades
   https://binance-docs.github.io/apidocs/spot/en/#old-trade-lookup
