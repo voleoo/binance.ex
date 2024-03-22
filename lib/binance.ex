@@ -783,4 +783,24 @@ defmodule Binance do
       err -> err
     end
   end
+
+  def all_orders(symbol) do
+    api_key = Application.get_env(:binance, :api_key)
+    secret_key = Application.get_env(:binance, :secret_key)
+
+    case HTTPClient.get_binance("/api/v3/allOrders", %{symbol: symbol}, secret_key, api_key) do
+      {:ok, data} -> {:ok, data}
+      error -> error
+    end
+  end
+
+  def my_trades(symbol) do
+    api_key = Application.get_env(:binance, :api_key)
+    secret_key = Application.get_env(:binance, :secret_key)
+
+    case HTTPClient.get_binance("/api/v3/myTrades", %{symbol: symbol}, secret_key, api_key) do
+      {:ok, data} -> {:ok, data}
+      error -> error
+    end
+  end
 end
